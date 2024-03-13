@@ -1,4 +1,4 @@
-package org.cosette;
+package org.qed;
 
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.io.FilenameUtils;
@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 
 
 /**
- * The Main logic of Cosette-Parser.
+ * The Main logic of Qed-Parser.
  */
 public class Main {
 
