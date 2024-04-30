@@ -1,4 +1,4 @@
-package org.cosette;
+package org.qed;
 
 import kala.collection.Seq;
 import org.apache.calcite.rex.RexNode;
@@ -8,8 +8,17 @@ public interface RexRN {
     static RelType.VarType varType(String id, boolean nullable) {
         return new RelType.VarType(id, nullable);
     }
-    static And and(RexRN ...sources) {
+
+    static And and(RexRN... sources) {
         return new And(Seq.from(sources));
+    }
+
+    static False falseLiteral() {
+        return new False();
+    }
+
+    static True trueLiteral() {
+        return new True();
     }
 
     RexNode semantics();
@@ -67,11 +76,11 @@ public interface RexRN {
         }
     }
 
-    record Or(Seq<RexRN> sources) implements RexRN {
+    record False() implements RexRN {
 
         @Override
         public RexNode semantics() {
-            return RuleBuilder.create().or(sources.map(RexRN::semantics));
+            return RuleBuilder.create().literal(false);
         }
     }
 
@@ -83,5 +92,20 @@ public interface RexRN {
         }
     }
 
+    record Or(Seq<RexRN> sources) implements RexRN {
+
+        @Override
+        public RexNode semantics() {
+            return RuleBuilder.create().or(sources.map(RexRN::semantics));
+        }
+    }
+
+    record True() implements RexRN {
+
+        @Override
+        public RexNode semantics() {
+            return RuleBuilder.create().literal(true);
+        }
+    }
 
 }

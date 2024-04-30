@@ -1,4 +1,4 @@
-package org.cosette;
+package org.qed;
 
 import kala.collection.Seq;
 import kala.collection.Set;
@@ -6,6 +6,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.util.ImmutableBitSet;
 
+import java.util.Arrays;
 import java.util.stream.IntStream;
 
 public interface RelRN {
@@ -23,16 +24,25 @@ public interface RelRN {
         return new RexRN.Field(ordinal, this);
     }
 
+    default Seq<RexRN> fields(int... ordinals) {
+        return Seq.from(Arrays.stream(ordinals).iterator()).map(this::field);
+    }
+
     default Seq<RexRN> fields() {
-        return Seq.from(IntStream.range(0, semantics().getRowType().getFieldCount()).iterator()).map(this::field);
+        return fields(IntStream.range(0, semantics().getRowType().getFieldCount()).toArray());
     }
 
     default RexRN joinField(int ordinal, RelRN right) {
         return new RexRN.JoinField(ordinal, this, right);
     }
 
+    default Seq<RexRN> joinFields(RelRN right, int... ordinals) {
+        return Seq.from(Arrays.stream(ordinals).iterator()).map(i -> joinField(i, right));
+    }
+
     default Seq<RexRN> joinFields(RelRN right) {
-        return Seq.from(IntStream.range(0, semantics().getRowType().getFieldCount() + right.semantics().getRowType().getFieldCount()).iterator()).map(i -> joinField(i, right));
+        return joinFields(right, IntStream.range(0,
+                semantics().getRowType().getFieldCount() + right.semantics().getRowType().getFieldCount()).toArray());
     }
 
     default RexRN.Pred pred(String name) {
@@ -67,7 +77,7 @@ public interface RelRN {
         return new Join(ty, cond, this, right);
     }
 
-    default Join join(JoinRelType ty, String name, RelRN right) { return join(ty, joinPred(name, right), right); }
+    default Join join(JoinRelType ty, String name, RelRN right) {return join(ty, joinPred(name, right), right);}
 
     default Union union(boolean all, RelRN... sources) {
         return new Union(all, Seq.of(this).appendedAll(sources));
@@ -77,11 +87,16 @@ public interface RelRN {
         return new Intersect(all, Seq.of(this).appendedAll(sources));
     }
 
+    default Empty empty() {
+        return new Empty(this);
+    }
+
     record Scan(String name, RelType.VarType ty, boolean unique) implements RelRN {
 
         @Override
         public RelNode semantics() {
-            var table = new CosetteTable(name, Seq.of(STR."col-\{name}"), Seq.of(ty), unique ? Set.of(ImmutableBitSet.of(0)) : Set.empty(), Set.empty());
+            var table = new QedTable(name, Seq.of(STR."col-\{name}"), Seq.of(ty), unique ?
+                    Set.of(ImmutableBitSet.of(0)) : Set.empty(), Set.empty());
             return RuleBuilder.create().addTable(table).scan(name).build();
         }
     }
@@ -126,6 +141,14 @@ public interface RelRN {
         @Override
         public RelNode semantics() {
             return RuleBuilder.create().pushAll(sources.map(RelRN::semantics)).intersect(all, sources.size()).build();
+        }
+    }
+
+    record Empty(RelRN sourceType) implements RelRN {
+
+        @Override
+        public RelNode semantics() {
+            return RuleBuilder.create().values(sourceType.semantics().getRowType()).build();
         }
     }
 

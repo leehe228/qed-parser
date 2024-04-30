@@ -1,9 +1,18 @@
-package org.cosette;
+package org.qed;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import kala.collection.Seq;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rex.RexNode;
 
+import java.io.File;
+import java.io.IOException;
+
 public interface RRule {
+    interface RRuleFamily {
+        Seq<RRule> family();
+    }
 
     RelRN before();
 
@@ -13,82 +22,16 @@ public interface RRule {
         return STR."\{getClass().getName()}\n\{before().semantics().explain()}=>\n\{after().semantics().explain()}";
     }
 
-    record FilterMerge() implements RRule {
-        static final RelRN source = RelRN.scan("Source", "Source_Type");
-        static final RexRN inner = source.pred("inner");
-        static final RexRN outer = source.pred("outer");
-
-        @Override
-        public RelRN before() {
-            return source.filter(inner).filter(outer);
-        }
-
-        @Override
-        public RelRN after() {
-            return source.filter(RexRN.and(inner, outer));
-        }
+    default String name() {
+        return getClass().getSimpleName();
     }
 
-    record FilterIntoJoin() implements RRule {
-        static final RelRN left = RelRN.scan("Left", "Left_Type");
-        static final RelRN right = RelRN.scan("Right", "Right_Type");
-        static final RexRN joinCond = left.joinPred("join", right);
-
-        @Override
-        public RelRN before() {
-            var join = left.join(JoinRelType.INNER, joinCond, right);
-            return join.filter("outer");
-        }
-
-        @Override
-        public RelRN after() {
-            return left.join(JoinRelType.INNER, RexRN.and(joinCond, left.joinPred("outer", right)), right);
-        }
+    default ObjectNode toJson() {
+        return JSONSerializer.serialize(Seq.of(before().semantics(), after().semantics()));
     }
 
-    record FilterProjectTranspose() implements RRule {
-        static final RelRN source = RelRN.scan("Source", "Source_Type");
-        static final RexRN proj = source.proj("proj", "Project_Type");
-
-        @Override
-        public RelRN before() {
-            return source.filter(proj.pred("pred")).project(proj);
-        }
-
-        @Override
-        public RelRN after() {
-            return source.project(proj).filter("pred");
-        }
-    }
-
-    record JoinConditionPush() implements RRule {
-        record JoinPred(RelRN left, RelRN right) implements RexRN {
-
-            @Override
-            public RexNode semantics() {
-                return RexRN.and(left.joinPred(bothPred(), right), left.joinField(0, right).pred(leftPred()), left.joinField(1, right).pred(rightPred())).semantics();
-            }
-
-            public String bothPred() { return "both"; }
-            public String leftPred() { return "left"; }
-            public String rightPred() { return "right"; }
-
-        }
-
-        static final RelRN left = RelRN.scan("Left", "Left_Type");
-        static final RelRN right = RelRN.scan("Right", "Right_Type");
-        static final JoinPred joinPred = new JoinPred(left, right);
-
-        @Override
-        public RelRN before() {
-            return left.join(JoinRelType.INNER, joinPred, right);
-        }
-
-        @Override
-        public RelRN after() {
-            var leftRN = left.filter(joinPred.leftPred());
-            var rightRN = right.filter(joinPred.rightPred());
-            return leftRN.join(JoinRelType.INNER, joinPred.bothPred(), rightRN);
-        }
+    default void dump(String path) throws IOException {
+        new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(new File(path), toJson());
     }
 }
+

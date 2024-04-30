@@ -227,7 +227,8 @@ class QedSchema extends AbstractSchema {
             }
         }
         var qedTable = new QedTable(createTable.name.toString(), names.zip(
-                        types.zip(nullabilities).map(type -> new RelType.BaseType(type.component1(), type.component2())))
+                        types.zip(nullabilities).map(type -> new RelType.BaseType(type.component1(),
+                                type.component2())))
                 .toImmutableMap(), ImmutableSet.from(keys), ImmutableSet.from(checkConstraints));
         tables.put(createTable.name.toString(), qedTable);
     }
