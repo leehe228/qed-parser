@@ -41,6 +41,10 @@ public sealed interface RelType extends RelDataType {
         public boolean isNullable() {
             return nullable;
         }
+
+        public String getName() {
+            return "INTEGER";
+        }
     }
 
     final class BaseType extends BasicSqlType implements RelType {

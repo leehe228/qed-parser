@@ -83,12 +83,12 @@ public class CalciteGenerator implements CodeGenerator<CalciteGenerator.Env> {
 
     @Override
     public Env onMatchPred(Env env, RexRN.Pred pred) {
-        return env.symbol(pred.name(), env.current());
+        return env.symbol(pred.operator().getName(), env.current());
     }
 
     @Override
     public Env onMatchProj(Env env, RexRN.Proj proj) {
-        return env.symbol(proj.name(), env.current());
+        return env.symbol(proj.operator().getName(), env.current());
     }
 
     @Override
@@ -136,7 +136,7 @@ public class CalciteGenerator implements CodeGenerator<CalciteGenerator.Env> {
 
     @Override
     public Env transformPred(Env env, RexRN.Pred pred) {
-        return env.focus(env.symbols().get(pred.name()));
+        return env.focus(env.symbols().get(pred.operator().getName()));
     }
 
     @Override
@@ -145,7 +145,7 @@ public class CalciteGenerator implements CodeGenerator<CalciteGenerator.Env> {
         var right_source_transform = transform(left_source_transform, join.right());
         var source_expression = right_source_transform.current();
         var cond_transform = transform(right_source_transform, join.cond());
-        var join_type = switch (join.ty()) {
+        var join_type = switch (join.ty().semantics()) {
             case INNER -> "JoinRelType.INNER";
             case LEFT -> "JoinRelType.LEFT";
             case RIGHT -> "JoinRelType.RIGHT";

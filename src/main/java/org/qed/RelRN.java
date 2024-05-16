@@ -4,6 +4,7 @@ import kala.collection.Seq;
 import kala.collection.Set;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.util.ImmutableBitSet;
 
 import java.util.Arrays;
@@ -45,16 +46,28 @@ public interface RelRN {
                 semantics().getRowType().getFieldCount() + right.semantics().getRowType().getFieldCount()).toArray());
     }
 
+    default RexRN.Pred pred(SqlOperator op) {
+        return new RexRN.Pred(op, fields());
+    }
+
     default RexRN.Pred pred(String name) {
-        return new RexRN.Pred(name, true, fields());
+        return pred(RuleBuilder.create().genericPredicateOp(name, true));
+    }
+
+    default RexRN.Pred joinPred(SqlOperator op, RelRN right) {
+        return new RexRN.Pred(op, joinFields(right));
     }
 
     default RexRN.Pred joinPred(String name, RelRN right) {
-        return new RexRN.Pred(name, true, joinFields(right));
+        return joinPred(RuleBuilder.create().genericPredicateOp(name, true), right);
+    }
+
+    default RexRN.Proj proj(SqlOperator op) {
+        return new RexRN.Proj(op, fields());
     }
 
     default RexRN.Proj proj(String name, String type_name) {
-        return new RexRN.Proj(name, type_name, true, fields());
+        return proj(RuleBuilder.create().genericProjectionOp(name, new RelType.VarType(type_name, true)));
     }
 
     default Filter filter(RexRN cond) {
@@ -73,8 +86,12 @@ public interface RelRN {
         return project(proj(name, type_name));
     }
 
-    default Join join(JoinRelType ty, RexRN cond, RelRN right) {
+    default Join join(Join.JoinType ty, RexRN cond, RelRN right) {
         return new Join(ty, cond, this, right);
+    }
+
+    default Join join(JoinRelType ty, RexRN cond, RelRN right) {
+        return join(new Join.JoinType.ConcreteJoinType(ty), cond, right);
     }
 
     default Join join(JoinRelType ty, String name, RelRN right) {return join(ty, joinPred(name, right), right);}
@@ -115,15 +132,34 @@ public interface RelRN {
         }
     }
 
-    record Join(JoinRelType ty, RexRN cond, RelRN left, RelRN right) implements RelRN {
+    record Join(Join.JoinType ty, RexRN cond, RelRN left, RelRN right) implements RelRN {
         @Override
         public RelNode semantics() {
-            return RuleBuilder.create().push(left.semantics()).push(right.semantics()).join(ty, cond.semantics()).build();
+            return RuleBuilder.create().push(left.semantics()).push(right.semantics()).join(ty.semantics(),
+                    cond.semantics()).build();
         }
 
         @Override
         public RexRN field(int ordinal) {
             return new RexRN.JoinField(ordinal, left, right);
+        }
+
+        public interface JoinType {
+            JoinRelType semantics();
+
+            record ConcreteJoinType(JoinRelType type) implements JoinType {
+                @Override
+                public JoinRelType semantics() {
+                    return type;
+                }
+            }
+
+            record MetaJoinType(String name) implements JoinType {
+                @Override
+                public JoinRelType semantics() {
+                    return JoinRelType.INNER;
+                }
+            }
         }
 
     }

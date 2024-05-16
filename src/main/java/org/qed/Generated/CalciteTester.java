@@ -1,5 +1,6 @@
 package org.qed.Generated;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import kala.collection.Seq;
 import kala.tuple.Tuple;
 import org.apache.calcite.plan.RelOptRule;
@@ -7,6 +8,7 @@ import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.RelNode;
 import org.qed.JSONDeserializer;
+import org.qed.JSONSerializer;
 import org.qed.RRule;
 import org.qed.RRuleInstance;
 
@@ -19,6 +21,7 @@ import java.nio.file.Path;
 public class CalciteTester {
     // Assuming that current working directory is the root of the project
     public static String genPath = "src/main/java/org/qed/Generated";
+    public static String rulePath = "rules";
 
     public static HepPlanner loadRule(RelOptRule rule) {
         var builder = new HepProgramBuilder().addRuleInstance(rule);
@@ -26,13 +29,16 @@ public class CalciteTester {
     }
 
     public static Seq<RRule> ruleList() {
-        var individuals = Seq.from(RRuleInstance.class.getClasses()).filter(RRule.class::isAssignableFrom).mapUnchecked(Class::getConstructor).mapUnchecked(Constructor::newInstance).map(r -> (RRule) r);
-        var families = Seq.from(RRuleInstance.class.getClasses()).filter(RRule.RRuleFamily.class::isAssignableFrom).mapUnchecked(Class::getConstructor).mapUnchecked(Constructor::newInstance).map(r -> (RRule.RRuleFamily) r);
+        var individuals =
+                Seq.from(RRuleInstance.class.getClasses()).filter(RRule.class::isAssignableFrom).mapUnchecked(Class::getConstructor).mapUnchecked(Constructor::newInstance).map(r -> (RRule) r);
+        System.out.println(Seq.from(RRuleInstance.class.getClasses()).filter(RRule.RRuleFamily.class::isAssignableFrom).mapUnchecked(Class::getConstructor));
+        var families =
+                Seq.from(RRuleInstance.class.getClasses()).filter(RRule.RRuleFamily.class::isAssignableFrom).mapUnchecked(Class::getConstructor).mapUnchecked(Constructor::newInstance).map(r -> (RRule.RRuleFamily) r);
         return individuals.appendedAll(families.flatMap(RRule.RRuleFamily::family));
     }
 
     public static void verify() {
-        ruleList().forEachUnchecked(rule -> rule.dump(STR."dump/\{rule.name()}.json"));
+        ruleList().forEachUnchecked(rule -> rule.dump(STR."\{rulePath}/\{rule.name()}.json"));
     }
 
     public static void generate() {
@@ -40,8 +46,13 @@ public class CalciteTester {
         ruleList().forEach(r -> tester.serialize(r, genPath));
     }
 
-    public static void main(String[] args) {
-        generate();
+    public static void main(String[] args) throws IOException {
+        var rules = new RRuleInstance.JoinAssociate();
+        Files.createDirectories(Path.of(rulePath));
+        for (var rule : rules.family()) {
+            new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(Path.of(rulePath, STR."\{rule.name()}-\{rule.info()}.json").toFile(), rule.toJson());
+        }
+//        generate();
 //        var tester = new CalciteTester();
 //        var builder = RuleBuilder.create();
 //        var table = builder.createQedTable(Seq.of(Tuple.of(RelType.fromString("INTEGER", true), false)));

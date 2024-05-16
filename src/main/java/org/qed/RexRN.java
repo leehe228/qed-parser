@@ -2,6 +2,7 @@ package org.qed;
 
 import kala.collection.Seq;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.SqlOperator;
 
 public interface RexRN {
 
@@ -23,13 +24,22 @@ public interface RexRN {
 
     RexNode semantics();
 
+    default Pred pred(SqlOperator op) {
+        return new Pred(op, Seq.of(this));
+    }
+
     default Pred pred(String name) {
-        return new Pred(name, true, Seq.of(this));
+        return pred(RuleBuilder.create().genericPredicateOp(name, true));
+    }
+
+    default Proj proj(SqlOperator op) {
+        return new Proj(op, Seq.of(this));
     }
 
     default Proj proj(String name, String type_name) {
-        return new Proj(name, type_name, true, Seq.of(this));
+        return proj(RuleBuilder.create().genericProjectionOp(name, new RelType.VarType(type_name, true)));
     }
+
 
     record Field(int ordinal, RelRN source) implements RexRN {
 
@@ -49,21 +59,23 @@ public interface RexRN {
         }
     }
 
-    record Pred(String name, boolean nullable, Seq<RexRN> sources) implements RexRN {
+    record Pred(SqlOperator operator, Seq<RexRN> sources) implements RexRN {
 
         @Override
         public RexNode semantics() {
             var builder = RuleBuilder.create();
-            return builder.call(builder.genericPredicateOp(name, nullable), sources.map(RexRN::semantics));
+//            builder.genericPredicateOp(name, nullable)
+            return builder.call(operator, sources.map(RexRN::semantics));
         }
     }
 
-    record Proj(String name, String type_name, boolean nullable, Seq<RexRN> sources) implements RexRN {
+    record Proj(SqlOperator operator, Seq<RexRN> sources) implements RexRN {
 
         @Override
         public RexNode semantics() {
             var builder = RuleBuilder.create();
-            return builder.call(builder.genericProjectionOp(name, varType(type_name, nullable)),
+//            builder.genericProjectionOp(name, varType(type_name, nullable))
+            return builder.call(operator,
                     sources.map(RexRN::semantics));
         }
     }

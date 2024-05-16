@@ -38,11 +38,18 @@ public record JSONSerializer(Env env) {
     }
 
     private static TextNode type(RelDataType type) {
+        if (type instanceof RelType.VarType varType) {
+            return new TextNode(varType.getName());
+        }
         return new TextNode(type.getSqlTypeName().getName());
     }
 
     private static IntNode integer(int i) {
         return new IntNode(i);
+    }
+
+    private static String qualifiedTableName(RelOptTable table) {
+        return Seq.from(table.getQualifiedName()).joinToString(".");
     }
 
     public static ObjectNode serialize(Seq<RelNode> relNodes) {
@@ -55,7 +62,7 @@ public record JSONSerializer(Env env) {
             var qedTable = table.unwrap(QedTable.class);
             var fields = Seq.from(table.getRowType().getFieldList());
             return qedTable == null ?
-                    object(Map.of("name", string(Seq.from(table.getQualifiedName()).joinToString(".")), "fields",
+                    object(Map.of("name", string(qualifiedTableName(table)), "fields",
                             array(fields.map(field -> string(field.getName()))), "types",
                             array(fields.map(field -> type(field.getType()))), "nullable",
                             array(fields.map(field -> bool(field.getType().isNullable()))), "key",
@@ -172,7 +179,7 @@ public record JSONSerializer(Env env) {
             }
 
             int resolve(RelOptTable table) {
-                var idx = tables.indexOf(table);
+                var idx = tables.map(JSONSerializer::qualifiedTableName).indexOf(qualifiedTableName(table));
                 if (idx == -1) {
                     idx = tables.size();
                     tables.append(table);
